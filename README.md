@@ -90,7 +90,7 @@ bash download_data.sh
 
 ---
 
-## Data Preprocessing
+## Demo Data Preprocessing
 
 Our preprocessing pipeline relies on [**TRAM**](https://github.com/yufu-wang/tram) and [**GVHMR**](https://github.com/zju3dv/GVHMR).  
 Please install and run them first. **Only single-person videos are supported.**
