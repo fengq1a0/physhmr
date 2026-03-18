@@ -1,135 +1,135 @@
 # PhysHMR
 
-🚧 **Code coming soon.**
-
 This repository contains the official implementation of **PhysHMR**, a physics-based human motion reconstruction framework from monocular videos.
 
-The codebase is currently under active reorganization and will be released incrementally.
+PhysHMR converts image features extracted by [GVHMR](https://github.com/zju3dv/GVHMR) into physically plausible human motion using reinforcement learning in a physics simulator ([Isaac Gym](https://developer.nvidia.com/isaac-gym)). It is built on top of the [PHC](https://github.com/ZhengyiLuo/PHC) framework.
 
 ---
 
-## Code Status
+## Setup
 
-The core implementation of PhysHMR is **built on top of the PHC framework**.  
-During the original research development, the implementation evolved organically with extensive task-specific adaptations and experimental modifications.
-As a result, the current codebase requires careful refactoring before being released in a clean and reproducible form.
+### 1. Create conda environment
 
-
----
-
-## Roadmap
-
-- [ ] Data preprocessing scripts  
-- [ ] Pretrained models on Human3.6M  
-- [ ] Refactored training code  
-
-
----
-
-## Dependencies
-Since this repository is built on top of PHC, the environment setup largely follows and adapts the instructions from PHC.
-
-### 1. Create a new conda environment and install PyTorch
-
-```
+```bash
 conda create -n physhmr python=3.8 -y
 conda activate physhmr
 pip install torch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
 pip install -r requirements.txt
 ```
 
-### 2. Download and setup [Isaac Gym](https://developer.nvidia.com/isaac-gym)
-Download Isaac Gym from
-https://developer.nvidia.com/isaac-gym
+### 2. Install Isaac Gym
 
-Then install it as a Python package:
-```
+Download from https://developer.nvidia.com/isaac-gym, then:
+
+```bash
 cd isaacgym/python
 pip install -e .
 cd ../..
 ```
-A small manual modification is required for compatibility with recent NumPy versions:
+
+Fix NumPy compatibility:
 ```
-File: physhmr/isaacgym/python/isaacgym/torch_utils.py
-Line 135: replace `np.float` with `np.float32`
-```
-You also need to set `LD_LIBRARY_PATH` so that Isaac Gym can find the correct shared libraries.
-Add the following line to your shell configuration or to all relevant bash scripts:
-```
-export LD_LIBRARY_PATH="/__path_to_your_conda__/envs/physhmr/lib:$LD_LIBRARY_PATH"
+File: isaacgym/python/isaacgym/torch_utils.py
+Line 135: replace np.float with np.float32
 ```
 
+Add to your shell config (required for Isaac Gym):
+```bash
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:$LD_LIBRARY_PATH"
+```
 
+### 3. Download SMPL models
 
-### 3. Download [SMPL](https://smpl.is.tue.mpg.de/) and [SMPLX](https://smpl-x.is.tue.mpg.de/) models
-Download SMPL paramters from [SMPL](https://smpl.is.tue.mpg.de/) and [SMPLX](https://smpl-x.is.tue.mpg.de/). Put them in the `data/smpl` folder, unzip them into 'data/smpl' folder. For SMPL, please download the v1.1.0 version, which contains the neutral humanoid. Rename the files `basicmodel_neutral_lbs_10_207_0_v1.1.0`, `basicmodel_m_lbs_10_207_0_v1.1.0.pkl`, `basicmodel_f_lbs_10_207_0_v1.1.0.pkl` to `SMPL_NEUTRAL.pkl`, `SMPL_MALE.pkl` and `SMPL_FEMALE.pkl`. For SMPLX, please download the v1.1 version. 
-After renaming, the directory structure should look like:
+Download from [SMPL](https://smpl.is.tue.mpg.de/) (v1.1.0) and [SMPLX](https://smpl-x.is.tue.mpg.de/) (v1.1). Rename and place in `data/smpl/`:
 
 ```
-|-- data
-    |-- smpl
-        |-- SMPL_FEMALE.pkl
-        |-- SMPL_NEUTRAL.pkl
-        |-- SMPL_MALE.pkl
-        |-- SMPLX_FEMALE.pkl
-        |-- SMPLX_NEUTRAL.pkl
-        |-- SMPLX_MALE.pkl
-        |-- SMPLX_FEMALE.npz
-        |-- SMPLX_NEUTRAL.npz
-        |-- SMPLX_MALE.npz
+data/smpl/
+  SMPL_FEMALE.pkl
+  SMPL_NEUTRAL.pkl
+  SMPL_MALE.pkl
+  SMPLX_FEMALE.pkl
+  SMPLX_NEUTRAL.pkl
+  SMPLX_MALE.pkl
 ```
-> **Tip:** You may have already downloaded most of these files when setting up GVHMR or TRAM.
 
+### 4. Download pretrained models and data
 
-### 4. Download PHC data and checkpoints
-Since PHC is used as the teacher model, its pretrained checkpoints are required:
-```
+```bash
 bash download_data.sh
 ```
 
+This downloads:
+- PHC teacher checkpoints (`output/HumanoidIm/phc_3/`, `phc_comp_3/`)
+- PhysHMR trained model (`output/HumanoidIm/BC+RL+kp2d_mixed_rerun/`)
+- Test data (`data/eval/`)
+- J_regressor (`data/J_regressor.npy`)
 
 ---
 
-## Demo Data Preprocessing
+## Inference
 
-Our preprocessing pipeline relies on [**TRAM**](https://github.com/yufu-wang/tram) and [**GVHMR**](https://github.com/zju3dv/GVHMR).  
-Please install and run them first. **Only single-person videos are supported.**
-
-### 1. Run TRAM
-Install TRAM and follow its **“Run demo on videos”** instructions.
-
-From the TRAM output directory, we require:
-- `camera.npy`
-- `hps/hps_track_0.npy`
-
-If multiple tracks are produced, we select the **longest** one.
-
-### 2. Run GVHMR
-Install GVHMR and follow its **Demo** instructions.
-
-From the GVHMR output directory, we require:
-- `hmr4d_results.pt`
-- `preprocess/vitpose.pt`
-
-### 3. Prepare PhysHMR inputs
-We provide a script to align the TRAM camera with GVHMR outputs and convert them into the format required by PhysHMR.
+Run PhysHMR on test data:
 
 ```bash
-python scripts/data_process/preprocess_physhmr.py \
-  --gvhmr_root /path/to/gvhmr/output \
-  --tram_root  /path/to/tram/output \
-  --out_root   /path/to/physhmr/processed
+bash scripts/test.sh data/eval/AIST++_test.pkl
 ```
 
+---
+
+## Evaluation
+
+### 1. Prepare AIST++ ground truth
+
+Download **Motion Data Only** and **Camera Data Only** from the [AIST++ dataset page](https://google.github.io/aistplusplus_dataset/download.html). Extract and place them as:
+
+```
+data/AIST++/
+  motions/          # .pkl files (e.g. gBR_sBM_cAll_d04_mBR0_ch01.pkl)
+  cameras/
+    mapping.txt
+    setting1.json
+    setting2.json
+    ...
+```
+
+Then generate GT SMPL parameters:
+
+```bash
+python scripts/gen_gt_from_aist.py
+```
+
+This produces `data/gt/GT_AIST++/` with one `.npz` per clip, matching the clips in `data/eval/AIST++_test.pkl`.
+
+### 2. Run evaluation
+
+```bash
+python scripts/visualize.py export/AIST++_test/ --eval --gt_path data/gt/GT_AIST++
+```
 
 ---
+
+## Visualization
+
+Render result videos:
+
+```bash
+# Single sequence
+python scripts/visualize.py export/AIST++_test/gLH_sBM_c01_d18_mLH2_ch06_00000.npz
+
+# All sequences in a directory
+python scripts/visualize.py export/AIST++_test/
+
+# Save PLY meshes
+python scripts/visualize.py export/AIST++_test/ --save_mesh --no_video
+```
+
+---
+
 ## References
-This project is based on and adapted from the following repository:
 
-- [PHC](https://github.com/ZhengyiLuo/PHC)
+This project is built on top of:
 
-PHC is under the BSD 3-Clause Clear License. See `THIRD_PARTY_LICENSES/` for details.
-PHC in turn builds upon [IsaacGymEnvs](https://github.com/NVIDIA-Omniverse/IsaacGymEnvs), [UHC](https://github.com/ZhengyiLuo/UniversalHumanoidControl), and [SMPL-X](https://github.com/vchoutas/smplx).
-Please refer to the original repository and its license files for
-additional third-party license information.
-
+- [PHC](https://github.com/ZhengyiLuo/PHC) (BSD 3-Clause Clear License, see `THIRD_PARTY_LICENSES/`)
+- [Isaac Gym](https://developer.nvidia.com/isaac-gym)
+- [GVHMR](https://github.com/zju3dv/GVHMR)
+- [TRAM](https://github.com/yufu-wang/tram)

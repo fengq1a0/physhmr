@@ -1,4 +1,10 @@
-tmp.md
-isaacgym
-output
-sample_data
+tmp*
+/isaacgym
+
+
+__pycache__/
+/output
+/sample_data
+/data
+/isaacgym
+/export
